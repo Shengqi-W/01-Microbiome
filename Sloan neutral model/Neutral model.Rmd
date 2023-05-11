@@ -1,0 +1,74 @@
+
+## instructions of the model
+
+```{r}
+#spp: A community table for communities of interest with local communities/samples as rows and taxa as columns. All samples must be rarefied to the same depth.
+#pool: A community table for defining source community (optional; Default=NULL).
+#taxon: A table listing the taxonomic calls for each otu, with OTU ids as row names and taxonomic classifications as columns.OTU
+#If stats=TRUE the function will return fitting statistics.
+#If stats=FALSE the function will return a table of observed and predicted values for each otu.
+```
+
+## load data
+
+```{r}
+rm(list = ls())
+library(ggplot2)
+library(ggsci)
+library(readxl)
+source('Neutral sloan model by adam2016.R')
+```
+
+## transfer the data to the required format
+
+```{r}
+taxon <- c('taxonomy','phylum','class','order','family','genus','species')
+otu <- read.csv('./taxa-data.csv',stringsAsFactors = F,row.names = 1)
+otu <- as.data.frame(t(otu))
+
+```
+
+## running
+
+```{r}
+stats <- sncm.fit(otu,pool=NULL,stats = TRUE,taxon = NULL)
+axes <- sncm.fit(otu,pool=NULL,stats = FALSE,taxon = NULL)
+```
+
+## position determined
+
+```{r}
+axes$type <- ''
+for (i in 1:nrow(axes)) {
+  if(axes$freq[i]>axes$pred.upr[i]){
+    axes$type[i] <- 'Above'
+  }else if(axes$freq[i]<axes$pred.lwr[i]){
+    axes$type[i] <- 'Below'
+  }else{
+    axes$type[i] <- 'Neutral'
+  } 
+}
+x<-rownames(axes)
+library(openxlsx)
+axes$fenlei<-x
+
+```
+
+## visulization
+
+```{r}
+plot <- ggplot(axes,aes(log10(p),freq,color=type))+geom_point(size = 1, alpha = 0.8)+
+  scale_colour_manual(values = c("#2D458B", "#C03426", "#2B9A3C"))+
+  guides(alpha="none",size="none",color=guide_legend(override.aes = list(size = 5)))+
+  geom_line(aes(log10(p),freq.pred),color='black',lwd=1)+geom_line(aes(log10(p),pred.lwr),color='black',lwd=1,linetype=2)+geom_line(aes(log10(p),pred.upr),color='black',lwd=1,linetype=2)+
+  # scale_color_aaas()+
+  theme_bw()+theme(legend.background = element_blank(),legend.position = c(0.9,0.1),panel.grid=element_blank())+
+  annotate('text',x=min(log10(axes$p))+0.38,y=0.95,label=round(stats$Rsqr,digits=3),size=5)+  #R2数值
+  annotate('text',x=min(log10(axes$p))+0.05,y=0.95,label=expression(paste('R'^2,'=')),size=5)+
+  labs(x=expression(paste('log'[10],' (Mean relative abundance)')),y='Occurence frequency')+
+  theme(axis.title=element_text(size=25),axis.text.x = element_text(size = 20),
+        axis.text.y = element_text(size = 20))
+plot
+ggsave(plot,filename = "S-Shenzhen.pdf", width = 8, height = 7, units = "in", dpi = 300) 
+  
+```
